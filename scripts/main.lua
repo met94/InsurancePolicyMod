@@ -323,6 +323,6 @@ end)
 
 RegisterConditionHooks()
 
-pd3.keys.Bind(Key.F3, function() CheckAndUnlock("force key", true) end, "force unlock achievement")
+-- pd3.keys.Bind(Key.F3, function() CheckAndUnlock("force key", true) end, "force unlock achievement")
 
-pd3.log.Info("loaded. F3 force unlock")
+pd3.log.Info("loaded.")

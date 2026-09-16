@@ -20,12 +20,6 @@ Hard+, heist `penthouse`) and completes the achievement through the game's own A
 
 Or from a git clone: `git submodule update --init`, then run `deploy.ps1` (see below).
 
-## Keybinds
-
-| Key | Action |
-|---|---|
-| F3 | Force unlock attempt (bypasses the condition; works in menu and in mission) |
-
 ## Config (`scripts/main.lua`, top)
 
 ```lua
@@ -59,7 +53,6 @@ Console markers:
 1. Install via `deploy.ps1` or the manual copy above, restart the game.
 2. Re-test the condition path: Touch The Sky, Hard+, grab a civilian as a human shield,
    walk into the escape holding the shield. Watch for the `***` lines.
-3. Force test without a heist: press F3 in the menu.
 
 Note: local challenge map status does not refresh mid-session after an unlock — treat
 Steam/platform UI as the source of truth.
