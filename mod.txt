@@ -1,0 +1,8 @@
+{
+    "name": "InsurancePolicyMod",
+    "description": "Insurance Policy achievement helper: reads DA_InsurancePolicy criterion, probes unlock levers, unlocks on custom condition (human shield held during escape, Hard+)",
+    "version": "0.1.0",
+    "author": "InsurancePolicySolo",
+    "tags": ["achievement", "cheat"],
+    "entry_point": "scripts/main.lua"
+}
