@@ -8,11 +8,7 @@ Hard+, heist `penthouse`) and completes the achievement through the game's own A
 
 | Key | Action |
 |---|---|
-| F1 | Read the `DA_InsurancePolicy` criterion (stat code, difficulty, heist) |
-| F2 | Probe unlock levers (managers, maps, challenge->achievement codes) |
 | F3 | Force unlock attempt (bypasses the condition; works in menu and in mission) |
-| F4 | Dump condition state (difficulty, heist, escape timer, shield state, latch) |
-| F9 | Reflection dump (mission + criterion + challenge/stat structs) |
 
 F5-F8 belong to HumanShieldMod, F10 is the pd3lib selftest.
 
@@ -55,4 +51,4 @@ Console markers:
 Note: local challenge map status does not refresh mid-session after an unlock — treat
 Steam/platform UI as the source of truth.
 
-Full write-up: `docs/insurance-policy.md`.
+Full write-up (including the removed discovery dumps): `docs/insurance-policy.md`.
