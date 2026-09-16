@@ -1,0 +1,3 @@
+[submodule "shared/pd3lib"]
+	path = shared/pd3lib
+	url = https://github.com/met94/pd3lib.git

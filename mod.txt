@@ -2,7 +2,7 @@
     "name": "InsurancePolicyMod",
     "description": "Insurance Policy achievement helper: unlocks on a solo proxy condition (human shield held during escape, Hard+)",
     "version": "0.2.0",
-    "author": "InsurancePolicySolo",
+    "author": "met94",
     "tags": ["achievement", "cheat"],
     "entry_point": "scripts/main.lua"
 }
