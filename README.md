@@ -53,13 +53,16 @@ chain stops at the first lever that succeeds, so a normal run produces a single 
 write/popup; fallbacks run only when an earlier lever fails. `RequestMissionEnd` remains a
 fallback retry; a single unlock attempt is made per session.
 
-Console markers:
+Console markers (only with `Config.Debug = true`):
 
 - `*** InsurancePolicy: condition latched ... ***`
 - `*** InsurancePolicy: condition cleared ... ***`
 - `*** InsurancePolicy: attempting unlock (poll) ... ***` — fires mid-escape while the shield is held
 - `*** InsurancePolicy: unlock requested via ... - verify in game/Steam ... ***`
 - `*** InsurancePolicy status (level-init|return-to-menu): ... ***`
+
+Unlock attempts and results are always logged (one short line each); everything else is
+diagnostic output behind `Config.Debug`.
 
 ## Config (`scripts/main.lua`, top)
 
@@ -68,6 +71,7 @@ Config = {
     HeistRef = "penthouse",     -- gate on heist ref, not level name ("Sky")
     MinDifficulty = 2,          -- 2 = Very Hard
     AutoUnlock = true,          -- condition path
+    Debug = false,              -- true: verbose diagnostics in the UE4SS console
     UnlockLevers = { "complete", "oss" },
 }
 ```

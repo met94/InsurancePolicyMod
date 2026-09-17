@@ -13,11 +13,17 @@ local Config = {
     HeistRef = "penthouse",
     MinDifficulty = 2, -- ESBZDifficulty: Normal=0, Hard=1, VeryHard=2, Overkill=3
     AutoUnlock = true,
+    Debug = false, -- true: verbose diagnostics in the UE4SS console
     -- Fallback chain: first lever that reports success ends the unlock attempt.
     -- "complete" = SBZAchievementManager:CompleteAchievement (candidates in order),
     -- "oss" = AchievementWriteCallbackProxy. Flip to { "oss", "complete" } if needed.
     UnlockLevers = { "complete", "oss" },
 }
+
+-- Verbose diagnostics: only printed when Config.Debug is true.
+local function Debug(...)
+    if Config.Debug then pd3.log.Info(...) end
+end
 
 local TARGET_ACH_CODE = "ACH_PH_HUMAN_SHIELD_EXTRACT"
 local TARGET_CHALLENGE_NAME = "AchievementSteamPenthouseHumanShieldExtract"
@@ -57,7 +63,7 @@ end
 local function FindTargetKey()
     local Found = nil
     for _, Summary in ipairs(pd3.challenge.Find(nil, "penthouse human shield")) do
-        pd3.log.Info("target achievement: key=%s name=%s status=%s",
+        Debug("target achievement: key=%s name=%s status=%s",
             Summary.Key, Summary.ChallengeName, pd3.challenge.StatusName(Summary.Status))
         if Found == nil and string.find(string.lower(Summary.ChallengeName), "steam", 1, true) then
             Found = Summary.Key
@@ -72,7 +78,7 @@ local function ScanMapStatus(Map, Label)
     pd3.maps.ForEach(Map, function(Key, Value)
         local Summary = pd3.challenge.RecordSummary(Key, Value)
         if TargetMatch(Summary.Key, Summary.ChallengeId, Summary.ChallengeName) then
-            pd3.log.Info("target[%s] key=%s name=%s status=%s", Label,
+            Debug("target[%s] key=%s name=%s status=%s", Label,
                 Summary.Key, Summary.ChallengeName, pd3.challenge.StatusName(Summary.Status))
             if Summary.Status == pd3.challenge.CompletedStatus then
                 Found = string.format("%s key=%s name=%s", Label, Summary.Key, Summary.ChallengeName)
@@ -104,11 +110,11 @@ end
 
 local function Unlock(Reason)
     if State.unlocked then
-        pd3.log.Info("unlock skipped (already unlocked this session via %s)", tostring(State.unlockedVia))
+        Debug("unlock skipped (already unlocked this session via %s)", tostring(State.unlockedVia))
         return
     end
     if State.unlocking then
-        pd3.log.Info("unlock skipped (attempt already in progress)")
+        Debug("unlock skipped (attempt already in progress)")
         return
     end
     State.unlocking = true
@@ -123,7 +129,7 @@ local function Unlock(Reason)
     State.attempted = true
 
     local Was, Detail = IsAlreadyUnlocked()
-    pd3.log.Info("unlock precheck: alreadyUnlocked=%s (%s) reason=%s achMgr=%s",
+    Debug("unlock precheck: alreadyUnlocked=%s (%s) reason=%s achMgr=%s",
         tostring(Was), tostring(Detail), Reason, tostring(AchName))
     if Was then
         State.unlocked = true
@@ -138,7 +144,7 @@ local function Unlock(Reason)
         pd3.timers.After(2500, function()
             local After, AfterDetail = IsAlreadyUnlocked()
             State.unlocked = After and true or false
-            pd3.log.Info("unlock postcheck: unlocked=%s (%s) attempted=%s",
+            Debug("unlock postcheck: unlocked=%s (%s) attempted=%s",
                 tostring(After), tostring(AfterDetail), tostring(State.unlockedVia))
             pd3.log.Info("*** InsurancePolicy: unlock requested via %s - verify in game/Steam (local map status can lag) ***",
                 tostring(State.unlockedVia))
@@ -156,12 +162,12 @@ local function Unlock(Reason)
             local Candidate = Candidates[Attempt]
             if Candidate == nil then OnDone(false); return end
             local Name, Index = pd3.safe.ToFName(Candidate)
-            pd3.log.Info("lever A.%d calling CompleteAchievement(text=%s fnameIdx=%s)", Attempt, tostring(Candidate), tostring(Index))
+            Debug("lever A.%d calling CompleteAchievement(text=%s fnameIdx=%s)", Attempt, tostring(Candidate), tostring(Index))
             if Name == nil then
                 pd3.log.Warn("lever A.%d skipped: FName not in name pool", Attempt)
             else
                 local OkCall, Err = pd3.challenge.Complete(Name)
-                pd3.log.Info("lever A.%d done ok=%s err=%s", Attempt, tostring(OkCall), pd3.safe.String(Err))
+                Debug("lever A.%d done ok=%s err=%s", Attempt, tostring(OkCall), pd3.safe.String(Err))
                 if OkCall then
                     State.unlockedVia = "CompleteAchievement(" .. tostring(Candidate) .. ")"
                     OnDone(true)
@@ -183,7 +189,7 @@ local function Unlock(Reason)
         local World = pd3.world.GetWorld()
         local PC = pd3.world.GetPlayerController()
         local OkWrite, WriteErr = pd3.safe.CallFn(Proxy, "WriteAchievementProgress", World, PC, Code or TARGET_ACH_CODE, 100.0, "")
-        pd3.log.Info("lever C OSS WriteAchievementProgress(%s) ok=%s err=%s", TARGET_ACH_CODE, tostring(OkWrite), pd3.safe.String(WriteErr))
+        Debug("lever C OSS WriteAchievementProgress(%s) ok=%s err=%s", TARGET_ACH_CODE, tostring(OkWrite), pd3.safe.String(WriteErr))
         if OkWrite then
             State.unlockedVia = "OSS"
         end
@@ -244,12 +250,12 @@ local function MaybeLatch(Source, Info)
     if Info == nil then return end
     if Info.EscapeActive and Info.ShieldActive then
         if not State.latched then
-            pd3.log.Info("*** InsurancePolicy: condition latched (source=%s, shield=%s) ***",
+            Debug("*** InsurancePolicy: condition latched (source=%s, shield=%s) ***",
                 Source, Name(Info.ShieldState, SHIELD_STATE_NAMES))
         end
         State.latched = true
     elseif State.latched and (not Info.EscapeActive or type(Info.ShieldState) == "number") then
-        pd3.log.Info("*** InsurancePolicy: condition cleared (source=%s, shield=%s) ***",
+        Debug("*** InsurancePolicy: condition cleared (source=%s, shield=%s) ***",
             Source, Name(Info.ShieldState, SHIELD_STATE_NAMES))
         State.latched = false
     end
@@ -260,14 +266,14 @@ local function CheckAndUnlock(Source, Force)
     local Info = ConditionState()
     if Info == nil then
         if Force then
-            pd3.log.Info("[%s] no mission state, forcing unlock anyway", Source)
+            Debug("[%s] no mission state, forcing unlock anyway", Source)
             Unlock("force key")
         else
-            pd3.log.Info("[%s] no mission state, skip", Source)
+            Debug("[%s] no mission state, skip", Source)
         end
         return
     end
-    pd3.log.Info("[%s] diff=%s heist=%s escapeLeft=%s playersInEscape=%s shield=%s latched=%s",
+    Debug("[%s] diff=%s heist=%s escapeLeft=%s playersInEscape=%s shield=%s latched=%s",
         Source, Name(Info.Difficulty, pd3.mission.DifficultyNames), Info.HeistRef, tostring(Info.EscapeLeft),
         tostring(Info.PlayersIn), Name(Info.ShieldState, SHIELD_STATE_NAMES), tostring(State.latched))
 
@@ -276,23 +282,23 @@ local function CheckAndUnlock(Source, Force)
         return
     end
     if not Config.AutoUnlock then
-        pd3.log.Info("[%s] auto unlock disabled", Source)
+        Debug("[%s] auto unlock disabled", Source)
         return
     end
     if not (type(Info.Difficulty) == "number" and Info.Difficulty >= Config.MinDifficulty) then
-        pd3.log.Info("[%s] condition fail: difficulty", Source)
+        Debug("[%s] condition fail: difficulty", Source)
         return
     end
     if not HeistMatches(Info) then
-        pd3.log.Info("[%s] condition fail: heist ref %s does not match config %s", Source, Info.HeistRef, Config.HeistRef)
+        Debug("[%s] condition fail: heist ref %s does not match config %s", Source, Info.HeistRef, Config.HeistRef)
         return
     end
     if not Info.EscapeActive then
-        pd3.log.Info("[%s] condition fail: escape not active", Source)
+        Debug("[%s] condition fail: escape not active", Source)
         return
     end
     if not Info.ShieldActive then
-        pd3.log.Info("[%s] condition fail: shield not held (state=%s)", Source,
+        Debug("[%s] condition fail: shield not held (state=%s)", Source,
             Name(Info.ShieldState, SHIELD_STATE_NAMES))
         return
     end
@@ -301,7 +307,7 @@ end
 
 local function LogTargetStatus(Tag)
     local Found = ScanMapStatus(pd3.challenge.Achievements(), "AchievementMap")
-    pd3.log.Info("*** InsurancePolicy status (%s): %s ***", tostring(Tag),
+    Debug("*** InsurancePolicy status (%s): %s ***", tostring(Tag),
         Found ~= nil and "COMPLETED(2)" or "INPROGRESS/unknown")
 end
 
@@ -349,12 +355,12 @@ end
 
 local function Activate(HeistRef)
     if PollHandle ~= nil then
-        pd3.log.Info("arm skipped: already armed (%s)", tostring(HeistRef))
+        Debug("arm skipped: already armed (%s)", tostring(HeistRef))
         return
     end
     State.latched = false
     State.attempted = false
-    pd3.log.Info("*** InsurancePolicy: armed for heist %s ***", tostring(HeistRef))
+    Debug("*** InsurancePolicy: armed for heist %s ***", tostring(HeistRef))
     RegisterConditionHooks()
     Poll()
     PollHandle = pd3.timers.Every(1000, Poll)
@@ -367,7 +373,7 @@ local function Deactivate(HeistRef, Reason)
         PollHandle = nil
     end
     UnregisterConditionHooks()
-    pd3.log.Info("*** InsurancePolicy: disarmed (heist=%s reason=%s) ***", tostring(HeistRef), tostring(Reason))
+    Debug("*** InsurancePolicy: disarmed (heist=%s reason=%s) ***", tostring(HeistRef), tostring(Reason))
     if State.attempted then
         pd3.timers.After(3000, function() LogTargetStatus("heist-exit") end)
     end
@@ -377,4 +383,4 @@ pd3.heist.Watch(Config.HeistRef, { Enter = Activate, Exit = Deactivate })
 
 -- pd3.keys.Bind(Key.F3, function() CheckAndUnlock("force key", true) end, "force unlock achievement")
 
-pd3.log.Info("loaded.")
+Debug("loaded.")
