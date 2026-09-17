@@ -13,7 +13,8 @@ local Config = {
     HeistRef = "penthouse",
     MinDifficulty = 1, -- ESBZDifficulty: Normal=0, Hard=1, VeryHard=2, Overkill=3
     AutoUnlock = true,
-    -- Order of unlock levers: "complete" = SBZAchievementManager:CompleteAchievement,
+    -- Fallback chain: first lever that reports success ends the unlock attempt.
+    -- "complete" = SBZAchievementManager:CompleteAchievement (candidates in order),
     -- "oss" = AchievementWriteCallbackProxy. Flip to { "oss", "complete" } if needed.
     UnlockLevers = { "complete", "oss" },
 }
@@ -29,6 +30,7 @@ local SHIELD_STATE_NAMES = {
 
 local State = {
     latched = false,
+    attempted = false,
     unlocked = false,
     unlockedVia = nil,
     unlocking = false,
@@ -118,6 +120,8 @@ local function Unlock(Reason)
         return
     end
 
+    State.attempted = true
+
     local Was, Detail = IsAlreadyUnlocked()
     pd3.log.Info("unlock precheck: alreadyUnlocked=%s (%s) reason=%s achMgr=%s",
         tostring(Was), tostring(Detail), Reason, tostring(AchName))
@@ -150,7 +154,7 @@ local function Unlock(Reason)
         local function Step()
             Attempt = Attempt + 1
             local Candidate = Candidates[Attempt]
-            if Candidate == nil then OnDone(); return end
+            if Candidate == nil then OnDone(false); return end
             local Name, Index = pd3.safe.ToFName(Candidate)
             pd3.log.Info("lever A.%d calling CompleteAchievement(text=%s fnameIdx=%s)", Attempt, tostring(Candidate), tostring(Index))
             if Name == nil then
@@ -160,6 +164,8 @@ local function Unlock(Reason)
                 pd3.log.Info("lever A.%d done ok=%s err=%s", Attempt, tostring(OkCall), pd3.safe.String(Err))
                 if OkCall then
                     State.unlockedVia = "CompleteAchievement(" .. tostring(Candidate) .. ")"
+                    OnDone(true)
+                    return
                 end
             end
             pd3.timers.After(1000, Step)
@@ -194,10 +200,11 @@ local function Unlock(Reason)
                 return
             end
             if Lever == "complete" then
-                RunCompleteCandidates(Next)
+                RunCompleteCandidates(function(Success)
+                    if Success then Postcheck() else Next() end
+                end)
             elseif Lever == "oss" then
-                RunOssLever()
-                Next()
+                if RunOssLever() then Postcheck() else Next() end
             else
                 pd3.log.Warn("unknown lever: %s", tostring(Lever))
                 Next()
@@ -222,8 +229,9 @@ local function ConditionState()
         HeistRef = tostring(pd3.mission.HeistRef(Mission)),
         EscapeLeft = Escape.TimeLeft,
         PlayersIn = Escape.PlayersIn,
+        EscapeActive = Escape.PlayersIn > 0,
         ShieldState = ShieldState,
-        ShieldActive = ShieldState == 3 or ShieldState == 4,
+        ShieldActive = type(ShieldState) == "number" and (ShieldState == 3 or ShieldState == 4),
     }
 end
 
@@ -234,17 +242,21 @@ end
 
 local function MaybeLatch(Source, Info)
     if Info == nil then return end
-    local EscapeActive = Info.EscapeLeft > 0 or Info.PlayersIn > 0
-    if EscapeActive and Info.ShieldActive then
+    if Info.EscapeActive and Info.ShieldActive then
         if not State.latched then
             pd3.log.Info("*** InsurancePolicy: condition latched (source=%s, shield=%s) ***",
                 Source, Name(Info.ShieldState, SHIELD_STATE_NAMES))
         end
         State.latched = true
+    elseif State.latched and (not Info.EscapeActive or type(Info.ShieldState) == "number") then
+        pd3.log.Info("*** InsurancePolicy: condition cleared (source=%s, shield=%s) ***",
+            Source, Name(Info.ShieldState, SHIELD_STATE_NAMES))
+        State.latched = false
     end
 end
 
 local function CheckAndUnlock(Source, Force)
+    if State.attempted and not Force then return end
     local Info = ConditionState()
     if Info == nil then
         if Force then
@@ -275,8 +287,13 @@ local function CheckAndUnlock(Source, Force)
         pd3.log.Info("[%s] condition fail: heist ref %s does not match config %s", Source, Info.HeistRef, Config.HeistRef)
         return
     end
-    if not State.latched then
-        pd3.log.Info("[%s] condition fail: shield latch not set", Source)
+    if not Info.EscapeActive then
+        pd3.log.Info("[%s] condition fail: escape not active", Source)
+        return
+    end
+    if not Info.ShieldActive then
+        pd3.log.Info("[%s] condition fail: shield not held (state=%s)", Source,
+            Name(Info.ShieldState, SHIELD_STATE_NAMES))
         return
     end
     Unlock(Source)
@@ -288,11 +305,22 @@ local function LogTargetStatus(Tag)
         Found ~= nil and "COMPLETED(2)" or "INPROGRESS/unknown")
 end
 
+local ESCAPE_HOOK = "/Script/Starbreeze.SBZMissionState:Multicast_SetEscapeVolumeData"
+local MISSION_END_HOOK = "/Script/Starbreeze.SBZGameStateMachine:RequestMissionEnd"
+
+local EscapeHookId = nil
+local MissionEndHookId = nil
+local PollHandle = nil
+
 local function RegisterConditionHooks()
-    pd3.hooks.Hook("/Script/Starbreeze.SBZMissionState:Multicast_SetEscapeVolumeData", function()
-        MaybeLatch("escape-volume-multicast", ConditionState())
+    if EscapeHookId ~= nil or MissionEndHookId ~= nil then return end
+    EscapeHookId = pd3.hooks.Hook(ESCAPE_HOOK, function()
+        -- Hook-context property reads are unreliable; defer a tick.
+        pd3.timers.After(250, function()
+            MaybeLatch("escape-volume-multicast", ConditionState())
+        end)
     end)
-    pd3.hooks.Hook("/Script/Starbreeze.SBZGameStateMachine:RequestMissionEnd", function()
+    MissionEndHookId = pd3.hooks.Hook(MISSION_END_HOOK, function()
         -- Do not call UFunctions from inside a hook callback; defer a tick.
         pd3.timers.After(250, function()
             CheckAndUnlock("mission-end", false)
@@ -300,28 +328,52 @@ local function RegisterConditionHooks()
     end)
 end
 
-pd3.lifecycle.OnLevelInit(function(LevelName)
-    State.latched = false
-    pd3.log.Info("level init: %s", tostring(LevelName))
-    pd3.timers.After(3000, function()
-        local Info = ConditionState()
-        if Info ~= nil then
-            pd3.log.Info("mission detected: diff=%s heist=%s", Name(Info.Difficulty, pd3.mission.DifficultyNames), Info.HeistRef)
-        end
-    end)
-    pd3.timers.After(5000, function() LogTargetStatus("level-init") end)
-end)
+local function UnregisterConditionHooks()
+    if EscapeHookId ~= nil then
+        pd3.hooks.Unhook(ESCAPE_HOOK, EscapeHookId)
+        EscapeHookId = nil
+    end
+    if MissionEndHookId ~= nil then
+        pd3.hooks.Unhook(MISSION_END_HOOK, MissionEndHookId)
+        MissionEndHookId = nil
+    end
+end
 
-pd3.lifecycle.OnReturnToMenu(function()
-    pd3.timers.After(3000, function() LogTargetStatus("return-to-menu") end)
-end)
-
-pd3.timers.Every(1000, function()
+local function Poll()
     local Info = ConditionState()
-    if Info ~= nil then MaybeLatch("poll", Info) end
-end)
+    if Info ~= nil then
+        MaybeLatch("poll", Info)
+        if State.latched then CheckAndUnlock("poll", false) end
+    end
+end
 
-RegisterConditionHooks()
+local function Activate(HeistRef)
+    if PollHandle ~= nil then
+        pd3.log.Info("arm skipped: already armed (%s)", tostring(HeistRef))
+        return
+    end
+    State.latched = false
+    State.attempted = false
+    pd3.log.Info("*** InsurancePolicy: armed for heist %s ***", tostring(HeistRef))
+    RegisterConditionHooks()
+    Poll()
+    PollHandle = pd3.timers.Every(1000, Poll)
+    LogTargetStatus("heist-enter")
+end
+
+local function Deactivate(HeistRef, Reason)
+    if PollHandle ~= nil then
+        pd3.timers.Cancel(PollHandle)
+        PollHandle = nil
+    end
+    UnregisterConditionHooks()
+    pd3.log.Info("*** InsurancePolicy: disarmed (heist=%s reason=%s) ***", tostring(HeistRef), tostring(Reason))
+    if State.attempted then
+        pd3.timers.After(3000, function() LogTargetStatus("heist-exit") end)
+    end
+end
+
+pd3.heist.Watch(Config.HeistRef, { Enter = Activate, Exit = Deactivate })
 
 -- pd3.keys.Bind(Key.F3, function() CheckAndUnlock("force key", true) end, "force unlock achievement")
 

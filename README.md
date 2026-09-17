@@ -36,15 +36,20 @@ needles are constants next to it.
 
 ## Auto condition
 
-Latches when the escape is active (`EscapeTimeLeft > 0` or `PlayersInEscapeVolume > 0`)
-while the player holds a human shield (`HumanShieldInstigatorState` 3/4), then at mission
-end (or `RequestMissionEnd`, deferred out of the hook) unlocks if difficulty >= Hard and
-heist ref matches.
+Unlocks on the first 1 s poll where the player is physically inside the escape volume
+(`PlayersInEscapeVolume > 0`), is *actively holding a human shield* (`HumanShieldInstigatorState`
+numerically 3/4), difficulty >= Hard and heist ref matches — while the shield is demonstrably
+in hand, not after the fact. Non-numeric shield reads (mission-end pawn transitions) never
+count as held, and merely having the escape window open elsewhere does not count. The unlock
+chain stops at the first lever that succeeds, so a normal run produces a single achievement
+write/popup; fallbacks run only when an earlier lever fails. `RequestMissionEnd` remains a
+fallback retry; a single unlock attempt is made per session.
 
 Console markers:
 
 - `*** InsurancePolicy: condition latched ... ***`
-- `*** InsurancePolicy: attempting unlock (...) ***`
+- `*** InsurancePolicy: condition cleared ... ***`
+- `*** InsurancePolicy: attempting unlock (poll) ... ***` — fires mid-escape while the shield is held
 - `*** InsurancePolicy: unlock requested via ... - verify in game/Steam ... ***`
 - `*** InsurancePolicy status (level-init|return-to-menu): ... ***`
 
