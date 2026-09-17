@@ -11,7 +11,7 @@ pd3.Init({ prefix = "[" .. MOD_NAME .. "]" })
 
 local Config = {
     HeistRef = "penthouse",
-    MinDifficulty = 1, -- ESBZDifficulty: Normal=0, Hard=1, VeryHard=2, Overkill=3
+    MinDifficulty = 2, -- ESBZDifficulty: Normal=0, Hard=1, VeryHard=2, Overkill=3
     AutoUnlock = true,
     -- Fallback chain: first lever that reports success ends the unlock attempt.
     -- "complete" = SBZAchievementManager:CompleteAchievement (candidates in order),
