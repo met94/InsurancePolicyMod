@@ -63,8 +63,11 @@ Unlock, in order:
 3. `CompleteAchievement("AchievementSteamPenthouseHumanShieldExtract")`
 4. `AchievementWriteCallbackProxy:WriteAchievementProgress(..., 100.0, "")`
 
-`Config.UnlockLevers` controls the order. Status is confirmed via the achievement map
-(COMPLETED) when it refreshes; the platform UI is authoritative.
+`Config.UnlockLevers` controls the order. All levers fire on an attempt — there is no early
+stop on a successful dispatch (`ok=true` only means the call did not raise, not that the
+platform accepted the write; 0.3.0 stopped after the first dispatch-ok lever and skipped the
+writes that actually unlock). Status is confirmed via the achievement map (COMPLETED) when it
+refreshes; the platform UI is authoritative.
 
 ## Result
 

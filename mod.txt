@@ -1,7 +1,7 @@
 {
     "name": "InsurancePolicyMod",
     "description": "Insurance Policy achievement helper: unlocks solo when you hold a human shield while escaping Touch The Sky on Very Hard+",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "author": "met94",
     "tags": ["achievement", "cheat"],
     "entry_point": "scripts/main.lua"

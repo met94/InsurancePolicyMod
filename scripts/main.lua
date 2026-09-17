@@ -14,7 +14,7 @@ local Config = {
     MinDifficulty = 2, -- ESBZDifficulty: Normal=0, Hard=1, VeryHard=2, Overkill=3
     AutoUnlock = true,
     Debug = false, -- true: verbose diagnostics in the UE4SS console
-    -- Fallback chain: first lever that reports success ends the unlock attempt.
+    -- Every lever is attempted in order on an unlock attempt:
     -- "complete" = SBZAchievementManager:CompleteAchievement (candidates in order),
     -- "oss" = AchievementWriteCallbackProxy. Flip to { "oss", "complete" } if needed.
     UnlockLevers = { "complete", "oss" },
@@ -170,8 +170,6 @@ local function Unlock(Reason)
                 Debug("lever A.%d done ok=%s err=%s", Attempt, tostring(OkCall), pd3.safe.String(Err))
                 if OkCall then
                     State.unlockedVia = "CompleteAchievement(" .. tostring(Candidate) .. ")"
-                    OnDone(true)
-                    return
                 end
             end
             pd3.timers.After(1000, Step)
@@ -206,11 +204,10 @@ local function Unlock(Reason)
                 return
             end
             if Lever == "complete" then
-                RunCompleteCandidates(function(Success)
-                    if Success then Postcheck() else Next() end
-                end)
+                RunCompleteCandidates(Next)
             elseif Lever == "oss" then
-                if RunOssLever() then Postcheck() else Next() end
+                RunOssLever()
+                Next()
             else
                 pd3.log.Warn("unknown lever: %s", tostring(Lever))
                 Next()

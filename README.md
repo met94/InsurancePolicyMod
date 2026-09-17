@@ -48,21 +48,26 @@ Unlocks on the first 1 s poll where the player is physically inside the escape v
 (`PlayersInEscapeVolume > 0`), is *actively holding a human shield* (`HumanShieldInstigatorState`
 numerically 3/4), difficulty >= Very Hard and heist ref matches — while the shield is demonstrably
 in hand, not after the fact. Non-numeric shield reads (mission-end pawn transitions) never
-count as held, and merely having the escape window open elsewhere does not count. The unlock
-chain stops at the first lever that succeeds, so a normal run produces a single achievement
-write/popup; fallbacks run only when an earlier lever fails. `RequestMissionEnd` remains a
-fallback retry; a single unlock attempt is made per session.
+count as held, and merely having the escape window open elsewhere does not count. On an
+attempt, every configured lever fires in order — three `CompleteAchievement` candidates
+(Steam hashed key, AccelByte code, challenge name) then the OSS write — so a forced unlock
+may issue several writes in one pass; `ok=true` only means the call dispatched, not that the
+platform accepted it. `RequestMissionEnd` remains a fallback retry; a single unlock attempt
+is made per session.
 
-Console markers (only with `Config.Debug = true`):
+Console markers, always logged:
+
+- `*** InsurancePolicy: attempting unlock (poll) ... ***` — fires mid-escape while the shield is held
+- `*** InsurancePolicy: unlock requested via ... - verify in game/Steam ... ***`
+
+Only with `Config.Debug = true`:
 
 - `*** InsurancePolicy: condition latched ... ***`
 - `*** InsurancePolicy: condition cleared ... ***`
-- `*** InsurancePolicy: attempting unlock (poll) ... ***` — fires mid-escape while the shield is held
-- `*** InsurancePolicy: unlock requested via ... - verify in game/Steam ... ***`
 - `*** InsurancePolicy status (level-init|return-to-menu): ... ***`
 
-Unlock attempts and results are always logged (one short line each); everything else is
-diagnostic output behind `Config.Debug`.
+Per-lever detail (candidate names, OSS result, postcheck) is diagnostic output behind
+`Config.Debug`.
 
 ## Config (`scripts/main.lua`, top)
 

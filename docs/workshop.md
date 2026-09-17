@@ -35,7 +35,7 @@ There is nothing to configure — the mod does everything by itself.
 
 ### Install
 
-1. Download `InsurancePolicyMod-0.3.0.zip`.
+1. Download `InsurancePolicyMod-0.3.1.zip`.
 2. Open the zip.
 3. Drag the `InsurancePolicyMod` folder into:
 
