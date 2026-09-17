@@ -1,7 +1,7 @@
 {
     "name": "InsurancePolicyMod",
-    "description": "Insurance Policy achievement helper: unlocks on a solo proxy condition (human shield held during escape, Hard+)",
-    "version": "0.2.0",
+    "description": "Insurance Policy achievement helper: unlocks solo when you hold a human shield while escaping Touch The Sky on Very Hard+",
+    "version": "0.3.0",
     "author": "met94",
     "tags": ["achievement", "cheat"],
     "entry_point": "scripts/main.lua"

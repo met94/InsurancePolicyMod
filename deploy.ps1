@@ -7,19 +7,33 @@ if (-not (Test-Path -LiteralPath $ModsRoot)) {
     exit 1
 }
 
-robocopy "$PSScriptRoot\scripts" "$ModsRoot\InsurancePolicyMod\scripts" /MIR /NFL /NDL /NJH /NJS
+$ModDir = "$ModsRoot\InsurancePolicyMod"
+$ScriptsDir = "$ModDir\scripts"
+$LibDir = "$ScriptsDir\pd3lib"
+$Pd3Lib = "$PSScriptRoot\shared\pd3lib"
+
+# /XD pd3lib + /XF pd3lib.lua keep the vendored library intact between deploys.
+robocopy "$PSScriptRoot\scripts" $ScriptsDir /MIR /NFL /NDL /NJH /NJS /XD pd3lib /XF pd3lib.lua
 if ($LASTEXITCODE -ge 8) {
     Write-Error "robocopy failed (scripts) with exit code $LASTEXITCODE"
     exit $LASTEXITCODE
 }
 
-New-Item -ItemType Directory -Force -Path "$ModsRoot\InsurancePolicyMod" | Out-Null
-Copy-Item -Force "$PSScriptRoot\mod.txt" "$ModsRoot\InsurancePolicyMod\mod.txt"
+New-Item -ItemType Directory -Force -Path $LibDir | Out-Null
 
-robocopy "$PSScriptRoot\shared\pd3lib" "$ModsRoot\shared\pd3lib" /MIR /NFL /NDL /NJH /NJS /XD .git /XF .git
-if ($LASTEXITCODE -ge 8) {
-    Write-Error "robocopy failed (pd3lib) with exit code $LASTEXITCODE"
-    exit $LASTEXITCODE
+# Vendored pd3lib: same layout as the release zip (scripts\pd3lib.lua + scripts\pd3lib\).
+Copy-Item -Force "$Pd3Lib\pd3lib.lua" "$ScriptsDir\pd3lib.lua"
+Copy-Item -Force "$Pd3Lib\selftest.lua" "$LibDir\selftest.lua"
+Copy-Item -Force "$Pd3Lib\LICENSE.md" "$LibDir\LICENSE.md"
+
+foreach ($Sub in @('core', 'game')) {
+    robocopy "$Pd3Lib\$Sub" "$LibDir\$Sub" /MIR /NFL /NDL /NJH /NJS
+    if ($LASTEXITCODE -ge 8) {
+        Write-Error "robocopy failed (pd3lib\$Sub) with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
 }
 
-Write-Host "deployed: InsurancePolicyMod + shared\pd3lib -> $ModsRoot"
+Copy-Item -Force "$PSScriptRoot\mod.txt" "$ModDir\mod.txt"
+
+Write-Host "deployed: InsurancePolicyMod (vendored pd3lib) -> $ModDir"

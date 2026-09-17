@@ -1,2 +1,3 @@
 *.log
 UE4SS_ObjectDump.txt
+dist/
