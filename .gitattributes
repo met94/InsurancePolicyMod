@@ -1,0 +1,4 @@
+# Keep checked-out text files LF on every platform: tooling and tests compare
+# raw bytes (e.g. generated artifacts) and generators write LF. Without this,
+# Windows checkouts under core.autocrlf=true produce CRLF.
+* text=auto eol=lf
